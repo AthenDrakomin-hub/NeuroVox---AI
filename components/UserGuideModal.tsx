@@ -66,7 +66,7 @@ const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose }) => {
                     <ol className="list-decimal list-inside space-y-1 ml-1">
                         <li>下载并解压 ZIP 压缩包。</li>
                         <li>找到 <span className="text-white bg-gray-700 px-1 rounded">VBCABLE_Setup_x64.exe</span>。</li>
-                        <li><span className="text-red-400 font-bold">必须右键点击 -> 选择“以管理员身份运行”</span>。</li>
+                        <li><span className="text-red-400 font-bold">必须右键点击 &rarr; 选择“以管理员身份运行”</span>。</li>
                         <li>安装完成后，<strong>重启电脑</strong>。</li>
                     </ol>
                 </div>
