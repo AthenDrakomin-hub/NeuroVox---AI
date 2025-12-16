@@ -218,7 +218,14 @@ const VoiceClonePanel: React.FC<VoiceClonePanelProps> = ({ onModelGenerated }) =
   // Cloned Voice Test Logic
   const runVoiceTest = async (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (!generatedData || !process.env.API_KEY) return;
+      if (!generatedData) return;
+      
+      if (!process.env.API_KEY) {
+          setErrorMessage("未配置 API Key，无法进行语音测试。");
+          setStatus('error');
+          return;
+      }
+
       setTestStatus('recording');
       setErrorMessage('');
 
@@ -400,7 +407,14 @@ const VoiceClonePanel: React.FC<VoiceClonePanelProps> = ({ onModelGenerated }) =
   };
 
   const processFile = async () => {
-    if (!file || !process.env.API_KEY) return;
+    if (!file) return;
+
+    // Check for API Key first
+    if (!process.env.API_KEY) {
+        setErrorMessage("错误：未配置 API Key。请检查 .env 文件或部署设置。");
+        setStatus('error');
+        return;
+    }
     
     setAnalyzing(true);
     setStatus('analyzing');
@@ -453,7 +467,7 @@ const VoiceClonePanel: React.FC<VoiceClonePanelProps> = ({ onModelGenerated }) =
       setModelNameInput(''); // Reset save input
     } catch (error) {
       console.error(error);
-      setErrorMessage('分析音频失败，请重试。');
+      setErrorMessage('分析音频失败，请重试。可能是网络问题或 Key 无效。');
       setStatus('error');
     } finally {
       setAnalyzing(false);

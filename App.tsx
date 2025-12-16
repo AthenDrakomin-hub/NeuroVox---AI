@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bot, Mic, Activity, Github } from 'lucide-react';
+import { Bot, Mic, Activity, Github, AlertTriangle } from 'lucide-react';
 import VoiceClonePanel from './components/VoiceClonePanel';
 import DeviceSettings from './components/DeviceSettings';
 import LiveTransmitter from './components/LiveTransmitter';
@@ -9,6 +9,9 @@ function App() {
   const [recommendedVoice, setRecommendedVoice] = useState('Zephyr');
   const [inputDeviceId, setInputDeviceId] = useState('');
   const [outputDeviceId, setOutputDeviceId] = useState('');
+
+  // Check for API Key immediately
+  const apiKeyMissing = !process.env.API_KEY;
 
   const handleModelGenerated = (instruction: string, voice: string) => {
     // We modify the instruction to enforce the repeater/translator role for voice changing
@@ -55,7 +58,17 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-cyber-900 text-white font-sans selection:bg-cyber-accent selection:text-black pb-10">
+    <div className="min-h-screen bg-cyber-900 text-white font-sans selection:bg-cyber-accent selection:text-black pb-10 relative">
+      {/* API Key Missing Alert Banner */}
+      {apiKeyMissing && (
+        <div className="bg-red-600/90 text-white px-4 py-3 text-center border-b border-red-500 backdrop-blur-md sticky top-0 z-50 flex items-center justify-center gap-2 shadow-lg animate-pulse">
+          <AlertTriangle className="w-5 h-5" />
+          <span className="font-bold text-sm">
+            系统未检测到 API Key！功能将无法使用。请在项目根目录创建 .env 文件并设置 API_KEY，或在部署平台配置环境变量。
+          </span>
+        </div>
+      )}
+
       {/* Background Decor */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyber-500/10 rounded-full blur-[100px]"></div>
@@ -79,11 +92,11 @@ function App() {
           </div>
           <div className="hidden md:flex items-center gap-6 text-xs font-mono text-gray-500">
              <div className="flex items-center gap-2">
-               <Activity className="w-4 h-4 text-green-500" />
-               <span>系统：在线</span>
+               <Activity className={`w-4 h-4 ${apiKeyMissing ? 'text-red-500' : 'text-green-500'}`} />
+               <span>系统：{apiKeyMissing ? '未就绪' : '在线'}</span>
              </div>
              <div className="flex items-center gap-2">
-               <span className="w-2 h-2 bg-cyber-accent rounded-full animate-pulse"></span>
+               <span className={`w-2 h-2 rounded-full ${apiKeyMissing ? 'bg-red-500' : 'bg-cyber-accent animate-pulse'}`}></span>
                <span>GEMINI 2.5 FLASH</span>
              </div>
           </div>
