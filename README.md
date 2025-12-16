@@ -2,7 +2,7 @@
 
 **NeuroVox** 是一个基于 Web 的实时语音转换与传输应用。它利用 Google Gemini Multimodal Live API (Gemini 2.5) 的强大能力，通过分析简短的音频样本生成特定的声音人设（Persona），并能将转换后的音频实时路由到虚拟音频设备（如 VB-Cable），从而在 Discord、Zoom、游戏或其他语音软件中使用。
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![License](https://img.shields.io/badge/license-Proprietary-red.svg)
 ![React](https://img.shields.io/badge/React-19.0-blue)
 ![Gemini API](https://img.shields.io/badge/Gemini-2.5%20Flash-orange)
 
@@ -136,12 +136,14 @@ NeuroVox 配合 VB-Cable 可以支持任何允许选择麦克风输入的 Window
    * Value: `你的_Google_API_Key`
 4. 点击 **Deploy**。
 
-## ⚠️ 注意事项与免责声明
+## ⚖️ 版权与许可 (Copyright)
 
-*   **API 配额**: Gemini Live API 目前处于预览阶段，可能存在速率限制或计费，请关注 Google Cloud 控制台。
-*   **延迟**: 延迟取决于你的网络连接与 Google 服务器的距离。
-*   **道德使用**: 本工具仅供娱乐、研究和合法创作使用。严禁用于欺诈、深度伪造（Deepfake）误导他人或任何非法用途。使用者需对生成的内容承担全部责任。
+**Copyright © 2024 NeuroVox Team. All Rights Reserved.**
 
-## 📄 许可证
+本项目为 **私有闭源软件**。保留所有权利。
 
-MIT License
+*   严禁未经授权的复制、分发、修改、反编译或将源代码用于商业用途。
+*   本软件仅供授权用户个人使用。
+*   代码中包含的知识产权和技术机密受法律保护。
+
+未经书面许可，不得擅自传播本项目代码。

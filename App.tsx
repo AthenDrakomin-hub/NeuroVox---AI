@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
-import { Bot, Mic, Activity, Github, AlertTriangle } from 'lucide-react';
+import { Bot, Activity, AlertTriangle, BookOpen } from 'lucide-react';
 import VoiceClonePanel from './components/VoiceClonePanel';
 import DeviceSettings from './components/DeviceSettings';
 import LiveTransmitter from './components/LiveTransmitter';
+import UserGuideModal from './components/UserGuideModal';
 
 function App() {
   const [systemInstruction, setSystemInstruction] = useState('');
   const [recommendedVoice, setRecommendedVoice] = useState('Zephyr');
   const [inputDeviceId, setInputDeviceId] = useState('');
   const [outputDeviceId, setOutputDeviceId] = useState('');
+  
+  // Modal State
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   // Check for API Key immediately
   const apiKeyMissing = !process.env.API_KEY;
@@ -69,6 +73,9 @@ function App() {
         </div>
       )}
 
+      {/* Guide Modal */}
+      <UserGuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
+
       {/* Background Decor */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyber-500/10 rounded-full blur-[100px]"></div>
@@ -90,15 +97,27 @@ function App() {
               <p className="text-sm text-gray-400 tracking-widest uppercase">实时 AI 语音身份系统</p>
             </div>
           </div>
-          <div className="hidden md:flex items-center gap-6 text-xs font-mono text-gray-500">
-             <div className="flex items-center gap-2">
-               <Activity className={`w-4 h-4 ${apiKeyMissing ? 'text-red-500' : 'text-green-500'}`} />
-               <span>系统：{apiKeyMissing ? '未就绪' : '在线'}</span>
-             </div>
-             <div className="flex items-center gap-2">
-               <span className={`w-2 h-2 rounded-full ${apiKeyMissing ? 'bg-red-500' : 'bg-cyber-accent animate-pulse'}`}></span>
-               <span>GEMINI 2.5 FLASH</span>
-             </div>
+          
+          <div className="flex items-center gap-6">
+              {/* Help Button */}
+              <button 
+                onClick={() => setIsGuideOpen(true)}
+                className="flex items-center gap-2 bg-cyber-800 hover:bg-cyber-700 border border-cyber-600 text-gray-300 hover:text-white px-4 py-2 rounded-lg transition-all text-xs font-bold uppercase tracking-wider group"
+              >
+                  <BookOpen className="w-4 h-4 group-hover:text-cyber-accent" />
+                  <span className="hidden sm:inline">使用指南</span>
+              </button>
+
+              <div className="hidden md:flex items-center gap-6 text-xs font-mono text-gray-500 border-l border-cyber-700 pl-6">
+                 <div className="flex items-center gap-2">
+                   <Activity className={`w-4 h-4 ${apiKeyMissing ? 'text-red-500' : 'text-green-500'}`} />
+                   <span>系统：{apiKeyMissing ? '未就绪' : '在线'}</span>
+                 </div>
+                 <div className="flex items-center gap-2">
+                   <span className={`w-2 h-2 rounded-full ${apiKeyMissing ? 'bg-red-500' : 'bg-cyber-accent animate-pulse'}`}></span>
+                   <span>GEMINI 2.5 FLASH</span>
+                 </div>
+              </div>
           </div>
         </header>
 
@@ -131,9 +150,12 @@ function App() {
 
       {/* Footer Instructions */}
       <div className="fixed bottom-0 w-full bg-cyber-800/80 backdrop-blur-md border-t border-cyber-700 py-3 text-center z-50">
-         <p className="text-xs text-gray-400">
-           <strong>配置指南：</strong> 上传 10-60秒 样本 &rarr; 设置输出为 VB-Cable &rarr; 在 微信/钉钉/Discord 中使用 “CABLE Output” 作为麦克风。
-         </p>
+         <button 
+           onClick={() => setIsGuideOpen(true)}
+           className="text-xs text-gray-400 hover:text-cyber-accent transition-colors"
+         >
+           <strong>配置指南：</strong> 上传 10-60秒 样本 &rarr; 设置输出为 VB-Cable &rarr; 在 微信/钉钉/Discord 中使用 “CABLE Output” (点击查看详细教程)
+         </button>
       </div>
     </div>
   );
