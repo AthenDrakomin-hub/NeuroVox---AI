@@ -22,7 +22,6 @@ const DeviceSettings: React.FC<DeviceSettingsProps> = ({
   const fetchDevices = async () => {
     setLoading(true);
     try {
-      // Request permission first to get labels
       await navigator.mediaDevices.getUserMedia({ audio: true });
       const devices = await navigator.mediaDevices.enumerateDevices();
       
@@ -32,7 +31,6 @@ const DeviceSettings: React.FC<DeviceSettingsProps> = ({
       setInputDevices(inputs);
       setOutputDevices(outputs);
 
-      // Auto-select VB-Cable if found and not set
       if (!selectedOutputId) {
         const vbCable = outputs.find(d => {
             const label = d.label.toLowerCase();
@@ -57,7 +55,7 @@ const DeviceSettings: React.FC<DeviceSettingsProps> = ({
       const gain = ctx.createGain();
       
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(440, ctx.currentTime); // A4
+      osc.frequency.setValueAtTime(440, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1);
       
       gain.gain.setValueAtTime(0.1, ctx.currentTime);
@@ -68,11 +66,10 @@ const DeviceSettings: React.FC<DeviceSettingsProps> = ({
       const dest = ctx.createMediaStreamDestination();
       gain.connect(dest);
 
-      // Create a temporary audio element to use setSinkId
       const audio = new Audio();
       audio.srcObject = dest.stream;
 
-      // @ts-ignore - setSinkId is experimental
+      // @ts-ignore
       if (selectedOutputId && typeof audio.setSinkId === 'function') {
         // @ts-ignore
         await audio.setSinkId(selectedOutputId);
@@ -95,7 +92,6 @@ const DeviceSettings: React.FC<DeviceSettingsProps> = ({
 
   useEffect(() => {
     fetchDevices();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -103,7 +99,7 @@ const DeviceSettings: React.FC<DeviceSettingsProps> = ({
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xl font-bold text-cyber-accent flex items-center gap-2">
           <Settings2 className="w-5 h-5" />
-          硬件配置
+          系统配置
         </h3>
         <button 
           onClick={fetchDevices} 
@@ -115,59 +111,47 @@ const DeviceSettings: React.FC<DeviceSettingsProps> = ({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Input Device */}
-        <div className="space-y-2">
-          <label className="text-sm text-gray-400 flex items-center gap-2">
-            <Mic className="w-4 h-4 text-blue-400" />
-            输入源 (麦克风)
-          </label>
-          <select
-            value={selectedInputId}
-            onChange={(e) => onInputDeviceChange(e.target.value)}
-            className="w-full bg-cyber-900 border border-cyber-700 text-white rounded-lg p-3 focus:ring-2 focus:ring-cyber-accent focus:border-transparent outline-none transition-all"
-          >
-            <option value="">默认麦克风</option>
-            {inputDevices.map((device) => (
-              <option key={device.deviceId} value={device.deviceId}>
-                {device.label || `Microphone ${device.deviceId.slice(0, 5)}...`}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Output Device */}
-        <div className="space-y-2">
-          <label className="text-sm text-gray-400 flex items-center gap-2">
-            <Speaker className="w-4 h-4 text-green-400" />
-            输出目标 (如 VB-Cable)
-          </label>
-          <div className="flex gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+           <div className="space-y-2">
+            <label className="text-xs text-gray-400 flex items-center gap-2">
+                <Mic className="w-3 h-3 text-blue-400" /> 输入源 (麦克风)
+            </label>
             <select
-                value={selectedOutputId}
-                onChange={(e) => onOutputDeviceChange(e.target.value)}
-                className="flex-1 bg-cyber-900 border border-cyber-700 text-white rounded-lg p-3 focus:ring-2 focus:ring-cyber-accent focus:border-transparent outline-none transition-all"
+                value={selectedInputId}
+                onChange={(e) => onInputDeviceChange(e.target.value)}
+                className="w-full bg-cyber-900 border border-cyber-700 text-white rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-cyber-accent outline-none"
             >
-                <option value="">默认扬声器</option>
-                {outputDevices.map((device) => (
+                <option value="">默认麦克风</option>
+                {inputDevices.map((device) => (
                 <option key={device.deviceId} value={device.deviceId}>
-                    {device.label || `Speaker ${device.deviceId.slice(0, 5)}...`}
+                    {device.label || `Mic ${device.deviceId.slice(0, 5)}...`}
                 </option>
                 ))}
             </select>
-            <button
-                onClick={playTestSound}
-                disabled={isPlayingTest}
-                className="bg-cyber-700 hover:bg-cyber-600 text-white p-3 rounded-lg border border-cyber-600 transition-colors"
-                title="播放测试音效以验证输出"
-            >
-                <Volume2 className={`w-5 h-5 ${isPlayingTest ? 'text-cyber-accent animate-pulse' : ''}`} />
-            </button>
-          </div>
-          <p className="text-xs text-gray-500 mt-1">
-            * 选择 <strong>CABLE Input (VB-Audio Virtual Cable)</strong> 以将音频路由到其他应用。
-          </p>
-        </div>
+           </div>
+
+           <div className="space-y-2">
+            <label className="text-xs text-gray-400 flex items-center gap-2">
+                <Speaker className="w-3 h-3 text-green-400" /> 输出目标 (VB-Cable)
+            </label>
+            <div className="flex gap-2">
+                <select
+                    value={selectedOutputId}
+                    onChange={(e) => onOutputDeviceChange(e.target.value)}
+                    className="flex-1 bg-cyber-900 border border-cyber-700 text-white rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-cyber-accent outline-none"
+                >
+                    <option value="">默认扬声器</option>
+                    {outputDevices.map((device) => (
+                    <option key={device.deviceId} value={device.deviceId}>
+                        {device.label || `Speaker ${device.deviceId.slice(0, 5)}...`}
+                    </option>
+                    ))}
+                </select>
+                <button onClick={playTestSound} className="bg-cyber-700 hover:bg-cyber-600 text-white p-2 rounded-lg border border-cyber-600">
+                    <Volume2 className={`w-4 h-4 ${isPlayingTest ? 'text-cyber-accent animate-pulse' : ''}`} />
+                </button>
+            </div>
+           </div>
       </div>
     </div>
   );

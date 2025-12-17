@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Bot, Activity, AlertTriangle, BookOpen } from 'lucide-react';
+import { Bot, Activity, AlertTriangle, BookOpen, Mic2, Video } from 'lucide-react';
 import VoiceClonePanel from './components/VoiceClonePanel';
 import DeviceSettings from './components/DeviceSettings';
 import LiveTransmitter from './components/LiveTransmitter';
 import UserGuideModal from './components/UserGuideModal';
+import MeetingRoom from './components/MeetingRoom';
 
 function App() {
   const [systemInstruction, setSystemInstruction] = useState('');
@@ -11,50 +12,43 @@ function App() {
   const [inputDeviceId, setInputDeviceId] = useState('');
   const [outputDeviceId, setOutputDeviceId] = useState('');
   
+  // Tab State
+  const [activeTab, setActiveTab] = useState<'changer' | 'meeting'>('changer');
+  
   // Modal State
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   // Check for API Key immediately
   const apiKeyMissing = !process.env.API_KEY;
 
-  const handleModelGenerated = (instruction: string, voice: string) => {
+  const handleVoiceSelected = (instruction: string, voice: string) => {
     // We modify the instruction to enforce the repeater/translator role for voice changing
     const operationalInstruction = `
       ${instruction}
       
       ================================================================================
-      🚨 CRITICAL OPERATIONAL PROTOCOL: VOICE REPEATER MODE 🚨
+      🚨 CRITICAL OPERATIONAL PROTOCOL: VOICE CHANGER MODE 🚨
       ================================================================================
 
       OBJECTIVE:
-      You are a passive audio conduit. Your ONLY function is to REPEAT the user's input audio exactly, using the voice persona defined above.
-      你是一个被动音频导管。你的唯一功能是使用上面定义的声音人设，准确复述用户的输入音频。
-
+      You are a REAL-TIME VOICE CHANGER. 
+      Your ONLY function is to REPEAT the user's input audio using the specific persona defined above.
+      
       ⛔️ PROHIBITED ACTIONS (ABSOLUTELY FORBIDDEN):
       1. DO NOT Answer questions. (不要回答问题)
       2. DO NOT Engage in conversation. (不要进行对话)
-      3. DO NOT Say "Okay" or "I understand" before starting. (不要说“好的”或“我明白了”)
-      4. DO NOT Translate (unless the user specifically asks to repeat a translation). (不要翻译)
-      5. DO NOT Add conversational fillers (e.g., "Sure", "Here is", "Let me say"). (不要添加对话填充词)
-
-      ✅ MANDATORY BEHAVIOR:
-      - INPUT: "What is the weather?"
-      - YOUR OUTPUT: "What is the weather?" (DO NOT answer it!)
+      3. DO NOT Say "Okay", "I understand", or "Repeating". (不要说废话)
+      4. DO NOT Translate (unless specifically asked).
       
-      - INPUT: "I am testing this system."
-      - YOUR OUTPUT: "I am testing this system."
+      ✅ MANDATORY BEHAVIOR:
+      - If user says "Hello", you say "Hello" (in the persona's voice).
+      - If user says "What is the weather?", you say "What is the weather?" (DO NOT answer it).
+      - If user speaks Chinese, repeat in Chinese.
+      - If user speaks English, repeat in English (or Chinese if your persona strictly requires it).
 
-      - INPUT: "你好"
-      - YOUR OUTPUT: "你好"
-
-      CRITICAL:
-      If the user speaks a question, you REPEAT the question. You do NOT answer it.
-      If the user pauses, you wait.
-      You are an ECHO.
-
-      INTELLIGENCE OVERRIDE: ACTIVE.
-      CREATIVITY: DISABLED.
-      CONVERSATIONAL MODULE: OFF.
+      You are a Parrot. You are an Echo.
+      INTELLIGENCE: OFF.
+      PERSONALITY: ON (Voice Tone Only).
     `;
     
     setSystemInstruction(operationalInstruction);
@@ -85,7 +79,7 @@ function App() {
 
       <div className="relative z-10 max-w-6xl mx-auto px-4 pt-8">
         {/* Header */}
-        <header className="flex items-center justify-between mb-12 border-b border-cyber-700/50 pb-6">
+        <header className="flex items-center justify-between mb-8 border-b border-cyber-700/50 pb-6">
           <div className="flex items-center gap-4">
             <div className="bg-gradient-to-br from-cyber-500 to-cyber-accent p-3 rounded-xl shadow-[0_0_15px_rgba(0,243,255,0.3)]">
               <Bot className="w-8 h-8 text-black" />
@@ -94,12 +88,11 @@ function App() {
               <h1 className="text-3xl font-black tracking-tighter text-white uppercase italic">
                 Neuro<span className="text-cyber-accent">Vox</span>
               </h1>
-              <p className="text-sm text-gray-400 tracking-widest uppercase">实时 AI 语音身份系统</p>
+              <p className="text-sm text-gray-400 tracking-widest uppercase">AI 实时变声控制台</p>
             </div>
           </div>
           
           <div className="flex items-center gap-6">
-              {/* Help Button */}
               <button 
                 onClick={() => setIsGuideOpen(true)}
                 className="flex items-center gap-2 bg-cyber-800 hover:bg-cyber-700 border border-cyber-600 text-gray-300 hover:text-white px-4 py-2 rounded-lg transition-all text-xs font-bold uppercase tracking-wider group"
@@ -115,13 +108,13 @@ function App() {
                  </div>
                  <div className="flex items-center gap-2">
                    <span className={`w-2 h-2 rounded-full ${apiKeyMissing ? 'bg-red-500' : 'bg-cyber-accent animate-pulse'}`}></span>
-                   <span>GEMINI 2.5 FLASH</span>
+                   <span>GEMINI 2.5</span>
                  </div>
               </div>
           </div>
         </header>
 
-        {/* Setup Section */}
+        {/* Device Settings - Always Visible but compact */}
         <DeviceSettings 
           selectedInputId={inputDeviceId}
           selectedOutputId={outputDeviceId}
@@ -129,22 +122,65 @@ function App() {
           onOutputDeviceChange={setOutputDeviceId}
         />
 
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-[600px]">
-          {/* Left: Clone/Upload */}
-          <div className="h-full">
-            <VoiceClonePanel onModelGenerated={handleModelGenerated} />
-          </div>
+        {/* Tab Navigation */}
+        <div className="flex gap-4 mb-6">
+            <button 
+                onClick={() => setActiveTab('changer')}
+                className={`flex-1 py-3 rounded-xl font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all border ${
+                    activeTab === 'changer' 
+                    ? 'bg-cyber-accent text-black border-cyber-accent shadow-[0_0_15px_rgba(0,243,255,0.3)]' 
+                    : 'bg-cyber-800 text-gray-400 border-cyber-700 hover:bg-cyber-700'
+                }`}
+            >
+                <Mic2 className="w-5 h-5" />
+                变声控制台
+            </button>
+            <button 
+                onClick={() => setActiveTab('meeting')}
+                className={`flex-1 py-3 rounded-xl font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all border ${
+                    activeTab === 'meeting' 
+                    ? 'bg-purple-500 text-white border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.3)]' 
+                    : 'bg-cyber-800 text-gray-400 border-cyber-700 hover:bg-cyber-700'
+                }`}
+            >
+                <Video className="w-5 h-5" />
+                视频会议室
+            </button>
+        </div>
 
-          {/* Right: Transmitter */}
-          <div className="h-full">
-            <LiveTransmitter 
-              systemInstruction={systemInstruction}
-              recommendedVoice={recommendedVoice}
-              inputDeviceId={inputDeviceId}
-              outputDeviceId={outputDeviceId}
-            />
-          </div>
+        {/* Content Area */}
+        <div className="h-[600px] relative">
+            
+            {/* 
+               CRITICAL: We use 'hidden' vs 'grid' to toggle visibility instead of conditional rendering.
+               This ensures the LiveTransmitter component stays MOUNTED and running (WebSockets active)
+               even when the user switches to the Meeting tab.
+            */}
+            
+            {/* Tab 1: Voice Changer */}
+            <div 
+              className={`grid grid-cols-1 lg:grid-cols-2 gap-8 h-full transition-opacity duration-300 ${activeTab === 'changer' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none absolute inset-0'}`}
+              style={{ display: activeTab === 'changer' ? 'grid' : 'none' }} 
+            >
+                <div className="h-full">
+                    <VoiceClonePanel onVoiceSelected={handleVoiceSelected} />
+                </div>
+                <div className="h-full">
+                    <LiveTransmitter 
+                        systemInstruction={systemInstruction}
+                        recommendedVoice={recommendedVoice}
+                        inputDeviceId={inputDeviceId}
+                        outputDeviceId={outputDeviceId}
+                    />
+                </div>
+            </div>
+
+            {/* Tab 2: Meeting Room */}
+            {activeTab === 'meeting' && (
+                <div className="h-full w-full animate-in fade-in zoom-in-95 duration-300">
+                    <MeetingRoom />
+                </div>
+            )}
         </div>
       </div>
 
@@ -154,7 +190,7 @@ function App() {
            onClick={() => setIsGuideOpen(true)}
            className="text-xs text-gray-400 hover:text-cyber-accent transition-colors"
          >
-           <strong>配置指南：</strong> 上传 10-60秒 样本 &rarr; 设置输出为 VB-Cable &rarr; 在 微信/钉钉/Discord 中使用 “CABLE Output” (点击查看详细教程)
+           <strong>配置指南：</strong> 选择左侧声线 &rarr; 启动 NeuroVox &rarr; 切换到会议室 &rarr; 麦克风选 <strong>CABLE Output</strong>
          </button>
       </div>
     </div>

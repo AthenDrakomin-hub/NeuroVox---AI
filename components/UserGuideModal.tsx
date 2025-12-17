@@ -95,11 +95,11 @@ const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose }) => {
                 </div>
                 
                 <div className="bg-cyber-800/30 p-4 rounded-lg border border-cyber-700/50">
-                    <div className="text-cyber-accent font-bold mb-2">2. 克隆声音</div>
+                    <div className="text-cyber-accent font-bold mb-2">2. 选择声线</div>
                     <ul className="text-sm space-y-2 list-disc list-inside">
-                        <li>上传 10-60秒 目标人物音频，或直接录音。</li>
-                        <li>点击“生成模型”等待分析完成。</li>
-                        <li>点击右侧红色的“启动 NeuroVox”按钮。</li>
+                        <li>在左侧面板选择一个喜欢的 <strong>预设声线</strong> (如：沉稳男声、清甜女声)。</li>
+                        <li>选中后，点击右侧红色的 <strong>启动 NeuroVox</strong> 按钮。</li>
+                        <li>等待连接成功后，对着麦克风说话即可。</li>
                     </ul>
                 </div>
             </div>

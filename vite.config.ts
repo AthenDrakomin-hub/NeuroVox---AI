@@ -14,6 +14,7 @@ export default defineConfig(({ mode }) => {
       // This is critical: it replaces 'process.env.API_KEY' in your source code
       // with the actual string value from the environment during the build.
       'process.env.API_KEY': JSON.stringify(env.API_KEY),
+      'process.env.API_BASE_URL': JSON.stringify(env.API_BASE_URL || ''),
     },
   };
 });

@@ -1,6 +1,6 @@
 {
-  "name": "NeuroVox - AI 语音克隆与传输系统",
-  "description": "专业的 AI 语音克隆和传输系统。上传语音样本生成模型，然后捕获实时麦克风输入，并使用 Gemini Live API 将转换后的音频传输到 VB-Cable 等虚拟设备。",
+  "name": "NeuroVox - AI 语音变声与传输系统",
+  "description": "专业的 AI 实时语音变声系统。选择预设声音人设，捕获实时麦克风输入，并使用 Gemini Live API 将转换后的音频传输到 VB-Cable 等虚拟设备。",
   "requestFramePermissions": [
     "microphone"
   ]

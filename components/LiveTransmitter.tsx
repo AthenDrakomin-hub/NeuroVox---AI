@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, Radio, Power, Activity, Volume2, AlertTriangle } from 'lucide-react';
+import { Mic, Radio, Power, Volume2, AlertTriangle, Lock, ShieldCheck, Zap } from 'lucide-react';
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
 import { createPcmBlob, decodeAudioData, decodeBase64 } from '../utils/audioUtils';
 
@@ -20,6 +20,7 @@ const LiveTransmitter: React.FC<LiveTransmitterProps> = ({
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   const [logs, setLogs] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSecure, setIsSecure] = useState(false);
   
   // Refs for audio context and processing
   const inputContextRef = useRef<AudioContext | null>(null);
@@ -36,7 +37,7 @@ const LiveTransmitter: React.FC<LiveTransmitterProps> = ({
   const animationFrameRef = useRef<number | null>(null);
 
   // Live API Session
-  const sessionRef = useRef<any>(null); // keeping the session promise object
+  const sessionRef = useRef<Promise<any> | null>(null); 
   const nextStartTimeRef = useRef<number>(0);
   const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
 
@@ -45,36 +46,30 @@ const LiveTransmitter: React.FC<LiveTransmitterProps> = ({
   };
 
   const cleanupAudio = () => {
-    // Stop visualizer
     if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
     }
     analyserRef.current = null;
 
-    // Stop input stream
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
     }
-    // Disconnect nodes
     if (scriptProcessorRef.current) scriptProcessorRef.current.disconnect();
     if (sourceRef.current) sourceRef.current.disconnect();
     
-    // Stop all output sources
     sourcesRef.current.forEach(source => {
       try { source.stop(); } catch (e) {}
     });
     sourcesRef.current.clear();
 
-    // Close contexts
     if (inputContextRef.current) inputContextRef.current.close();
     if (outputContextRef.current) outputContextRef.current.close();
     
-    // Close session
     if (sessionRef.current) {
       sessionRef.current.then((session: any) => {
           try { session.close(); } catch(e) {}
-      });
+      }).catch(() => {}); // Ignore errors on cleanup
     }
 
     inputContextRef.current = null;
@@ -90,7 +85,6 @@ const LiveTransmitter: React.FC<LiveTransmitterProps> = ({
       
       if (!ctx) return;
 
-      // Handle Resize/DPI
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
       canvas.width = rect.width * dpr;
@@ -103,7 +97,7 @@ const LiveTransmitter: React.FC<LiveTransmitterProps> = ({
       const height = rect.height;
 
       const draw = () => {
-          if (!analyserRef.current) return; // Stop if destroyed
+          if (!analyserRef.current) return;
           animationFrameRef.current = requestAnimationFrame(draw);
           
           analyser.getByteFrequencyData(dataArray);
@@ -117,64 +111,78 @@ const LiveTransmitter: React.FC<LiveTransmitterProps> = ({
           for (let i = 0; i < bufferLength; i++) {
               const value = dataArray[i];
               const percent = value / 255;
-              barHeight = percent * height * 0.8; // Scale height
+              barHeight = percent * height * 0.8;
 
-              // Cyber Glow
               ctx.shadowBlur = 10;
               ctx.shadowColor = "rgba(0, 243, 255, 0.5)";
               ctx.fillStyle = `rgba(0, 243, 255, ${percent + 0.3})`;
               
-              // Draw Bar
               ctx.fillRect(x + (width / bufferLength - barWidth) / 2, (height - barHeight) / 2, barWidth, barHeight);
-              
               x += width / bufferLength;
           }
       };
       draw();
   };
 
+  const fetchEphemeralToken = async () => {
+      try {
+          // Short timeout for token fetch to avoid blocking if the endpoint is missing
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 1500);
+          const response = await fetch('/api/token', { signal: controller.signal });
+          clearTimeout(timeoutId);
+          if (!response.ok) return null;
+          const data = await response.json();
+          return data.token;
+      } catch (e) {
+          return null;
+      }
+  };
+
   const startSession = async () => {
-    if (!process.env.API_KEY) {
-      addLog("错误：缺少 API 密钥");
-      setErrorMessage("缺少 API 密钥");
-      return;
+    let authToken = process.env.API_KEY;
+    let usingEphemeral = false;
+
+    addLog("正在初始化安全连接...");
+    const ephemeralToken = await fetchEphemeralToken();
+    if (ephemeralToken) {
+        authToken = ephemeralToken;
+        usingEphemeral = true;
+        setIsSecure(true);
+        addLog("已获取临时安全令牌。");
+    } else {
+        setIsSecure(false);
+        if (!authToken) {
+            addLog("错误：缺少 Gemini API 密钥");
+            setErrorMessage("缺少 Gemini API 密钥");
+            return;
+        }
     }
 
     setIsActive(true);
     setConnectionStatus('connecting');
     setErrorMessage(null);
-    addLog("正在初始化音频上下文...");
 
     try {
-      // 1. Setup Input Context (Force 16kHz for Gemini compatibility)
-      // The browser will handle resampling from the hardware rate to this context rate.
       inputContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-      
-      // 2. Setup Output Context (24kHz for Gemini output)
-      // Gemini usually sends 24kHz audio.
       outputContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
 
-      // 3. Configure Output Routing (VB-Cable support)
       outputDestinationRef.current = outputContextRef.current.createMediaStreamDestination();
       
       if (audioOutputElRef.current) {
         audioOutputElRef.current.srcObject = outputDestinationRef.current.stream;
         audioOutputElRef.current.play();
         
-        // @ts-ignore - setSinkId is experimental
+        // @ts-ignore
         if (outputDeviceId && typeof audioOutputElRef.current.setSinkId === 'function') {
            try {
              // @ts-ignore
              await audioOutputElRef.current.setSinkId(outputDeviceId);
-             addLog(`输出已路由到设备: ${outputDeviceId}`);
-           } catch (e) {
-             console.warn("SetSinkId failed", e);
-             addLog("无法设置输出设备，使用默认。");
-           }
+             addLog(`输出已路由: ${outputDeviceId}`);
+           } catch (e) {}
         }
       }
 
-      // 4. Get User Media
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           deviceId: inputDeviceId ? { exact: inputDeviceId } : undefined,
@@ -185,23 +193,16 @@ const LiveTransmitter: React.FC<LiveTransmitterProps> = ({
       });
       streamRef.current = stream;
 
-      // 5. Connect Input Logic
       const source = inputContextRef.current.createMediaStreamSource(stream);
       sourceRef.current = source;
       
-      // Setup Analyser for Visualizer
       const analyser = inputContextRef.current.createAnalyser();
-      analyser.fftSize = 64; // Low FFT size for fewer, thicker bars (retro style)
+      analyser.fftSize = 64; 
       analyser.smoothingTimeConstant = 0.6;
       source.connect(analyser);
       analyserRef.current = analyser;
       startVisualizer();
 
-      // OPTIMIZATION: Buffer Size
-      // 1024 samples @ 16kHz = 64ms latency
-      // 512 samples @ 16kHz = 32ms latency
-      // 256 samples @ 16kHz = 16ms latency (Risk of audio glitches/crackling on slower CPUs)
-      // We choose 512 as a safe sweet spot for low latency.
       const BUFFER_SIZE = 512;
       const processor = inputContextRef.current.createScriptProcessor(BUFFER_SIZE, 1, 1);
       scriptProcessorRef.current = processor;
@@ -209,14 +210,16 @@ const LiveTransmitter: React.FC<LiveTransmitterProps> = ({
       source.connect(processor);
       processor.connect(inputContextRef.current.destination);
 
-      // 6. Connect to Gemini Live
       addLog("正在连接 Gemini Live...");
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ 
+          apiKey: authToken,
+          baseUrl: process.env.API_BASE_URL || undefined
+      });
       
       const config = {
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
-          responseModalities: [Modality.AUDIO],
+          responseModalities: [Modality.AUDIO], // Exclusively use Audio modality
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: recommendedVoice || 'Zephyr' } }
           },
@@ -229,12 +232,14 @@ const LiveTransmitter: React.FC<LiveTransmitterProps> = ({
         callbacks: {
           onopen: () => {
             setConnectionStatus('connected');
-            addLog("已连接到 Gemini Live 网络。");
-            nextStartTimeRef.current = outputContextRef.current?.currentTime || 0;
+            addLog(`已连接 (Gemini Voice)`);
+            if (outputContextRef.current) {
+                nextStartTimeRef.current = outputContextRef.current.currentTime;
+            }
           },
           onmessage: async (message: LiveServerMessage) => {
+             // Handle Native Gemini Audio
              const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-             
              if (base64Audio && outputContextRef.current && outputDestinationRef.current) {
                 try {
                   const audioCtx = outputContextRef.current;
@@ -245,33 +250,23 @@ const LiveTransmitter: React.FC<LiveTransmitterProps> = ({
                   source.buffer = audioBuffer;
                   source.connect(outputDestinationRef.current);
                   
-                  // OPTIMIZATION: Scheduling Logic
                   const currentTime = audioCtx.currentTime;
-                  
-                  // We use a small lookahead to prevent audio gaps if the main thread jitters.
-                  // 0.010s (10ms) is tight enough to feel instant but safe enough for web browsers.
-                  // Lowering this further (e.g. 0.005) increases risk of "glitchy" audio.
-                  const SCHEDULE_LOOKAHEAD = 0.010; 
-
+                  const SCHEDULE_LOOKAHEAD = 0.020; // Slightly increased lookahead for stability
                   if (nextStartTimeRef.current < currentTime) {
-                      // Buffer underrun (we ran out of audio to play).
-                      // Schedule immediately at current time + lookahead.
                       nextStartTimeRef.current = currentTime + SCHEDULE_LOOKAHEAD;
                   }
                   
                   source.start(nextStartTimeRef.current);
                   nextStartTimeRef.current += audioBuffer.duration;
-                  
                   sourcesRef.current.add(source);
                   source.onended = () => sourcesRef.current.delete(source);
-
                 } catch (e) {
-                  console.error("Error processing output audio", e);
+                  console.error("Audio Decode Error", e);
                 }
              }
 
              if (message.serverContent?.interrupted) {
-                addLog("检测到中断。正在清除缓冲区。");
+                addLog("检测到中断。");
                 sourcesRef.current.forEach(s => {
                     try { s.stop(); } catch(e){}
                 });
@@ -291,40 +286,54 @@ const LiveTransmitter: React.FC<LiveTransmitterProps> = ({
         }
       });
 
+      // Handle initial connection failures (e.g. Network Error)
+      sessionPromise.catch((err: any) => {
+          console.error("Connection failed:", err);
+          setErrorMessage(err.message || "Network Error: Cannot connect to Gemini Live API");
+          setConnectionStatus('error');
+          setIsActive(false);
+          cleanupAudio();
+      });
+
       sessionRef.current = sessionPromise;
 
       processor.onaudioprocess = (e) => {
         if (!inputContextRef.current) return;
         const inputData = e.inputBuffer.getChannelData(0);
         const pcmBlob = createPcmBlob(inputData);
-        sessionPromise.then(session => {
-            session.sendRealtimeInput({ media: pcmBlob });
-        });
+        
+        if (sessionRef.current) {
+            sessionRef.current
+                .then(session => {
+                    try {
+                        session.sendRealtimeInput({ media: pcmBlob });
+                    } catch (err) {
+                        // Session might be closed or closing
+                    }
+                })
+                .catch(() => {
+                    // Suppress errors if sessionPromise failed (handled above)
+                });
+        }
       };
 
     } catch (error: any) {
-      console.error("Initialization Error:", error);
-      let msg = error.message;
-      if (error.name === 'OverconstrainedError') {
-        msg = "硬件参数冲突：设备不支持请求的配置。";
-      } else if (error.name === 'NotReadableError') {
-        msg = "硬件无法访问：可能被其他应用占用或发生系统冲突。";
-      }
-      addLog(`初始化失败: ${msg}`);
-      setErrorMessage(msg);
+      console.error("Init Error", error);
+      setErrorMessage(error.message);
       setConnectionStatus('error');
       setIsActive(false);
+      cleanupAudio();
     }
   };
 
   const stopSession = () => {
     setIsActive(false);
     setConnectionStatus('disconnected');
+    setIsSecure(false);
     cleanupAudio();
     addLog("会话已结束。");
   };
 
-  // Add cleanup on unmount
   useEffect(() => {
     return () => {
         cleanupAudio();
@@ -333,7 +342,6 @@ const LiveTransmitter: React.FC<LiveTransmitterProps> = ({
 
   return (
     <div className="bg-cyber-800 border border-cyber-700 rounded-xl p-6 shadow-lg shadow-cyber-900/50 flex flex-col h-full">
-        {/* Hidden audio element for sinking to VB-Cable */}
         <audio ref={audioOutputElRef} className="hidden" />
 
         <div className="flex items-center justify-between mb-6">
@@ -341,32 +349,48 @@ const LiveTransmitter: React.FC<LiveTransmitterProps> = ({
                 <Radio className={`w-6 h-6 ${isActive ? 'text-red-500 animate-pulse' : 'text-gray-500'}`} />
                 <h3 className="text-xl font-bold text-white">实时传输</h3>
             </div>
-            <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                connectionStatus === 'connected' ? 'bg-green-500/20 text-green-400 border border-green-500/50' :
-                connectionStatus === 'connecting' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50' :
-                connectionStatus === 'error' ? 'bg-red-500/20 text-red-400 border border-red-500/50' :
-                'bg-gray-700 text-gray-400'
-            }`}>
-                {connectionStatus === 'connected' ? '已连接' : 
-                 connectionStatus === 'connecting' ? '连接中' : 
-                 connectionStatus === 'error' ? '错误' : '未连接'}
+            
+            <div className="flex items-center gap-2">
+                {isActive && (
+                    <div 
+                        className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border transition-all ${isSecure ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-gray-700/50 text-gray-500 border-gray-600'}`}
+                    >
+                        {isSecure ? <ShieldCheck className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                        {isSecure ? "SECURE" : "KEY"}
+                    </div>
+                )}
+                
+                {/* Engine Indicator */}
+                <div className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border bg-green-500/20 text-green-400 border-green-500/30">
+                    <Zap className="w-3 h-3" />
+                    GEMINI LIVE
+                </div>
+
+                <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                    connectionStatus === 'connected' ? 'bg-green-500/20 text-green-400 border border-green-500/50' :
+                    connectionStatus === 'connecting' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50' :
+                    connectionStatus === 'error' ? 'bg-red-500/20 text-red-400 border border-red-500/50' :
+                    'bg-gray-700 text-gray-400'
+                }`}>
+                    {connectionStatus === 'connected' ? '已连接' : 
+                     connectionStatus === 'connecting' ? '连接中' : 
+                     connectionStatus === 'error' ? '错误' : '未连接'}
+                </div>
             </div>
         </div>
 
         <div className="flex-1 bg-cyber-900/50 rounded-lg p-4 mb-6 border border-cyber-700/50 relative overflow-hidden flex items-center justify-center">
-             {/* Real-time Visualizer Canvas */}
              <canvas 
                 ref={canvasRef} 
                 className="absolute inset-0 w-full h-full opacity-60"
              />
              
-             {/* Overlay Content */}
              <div className="absolute top-2 left-2 z-10 text-xs text-gray-400 font-mono pointer-events-none">
                 <div className="flex items-center gap-2">
                     <Mic className="w-3 h-3" /> 输入: {inputDeviceId ? '自定义' : '默认'}
                 </div>
                 <div className="flex items-center gap-2 mt-1">
-                    <Volume2 className="w-3 h-3" /> 输出: {outputDeviceId ? '自定义 (VB-Cable)' : '默认'}
+                    <Volume2 className="w-3 h-3" /> 输出: {outputDeviceId ? '自定义' : '默认'}
                 </div>
              </div>
 
@@ -381,7 +405,6 @@ const LiveTransmitter: React.FC<LiveTransmitterProps> = ({
              )}
         </div>
 
-        {/* Logs */}
         <div className="bg-black/40 rounded p-2 mb-4 h-24 overflow-y-auto font-mono text-xs text-green-400/80 border border-cyber-700/30">
             {logs.length === 0 && <span className="text-gray-600">系统就绪...</span>}
             {logs.map((log, i) => (
@@ -407,7 +430,7 @@ const LiveTransmitter: React.FC<LiveTransmitterProps> = ({
         </button>
         {!systemInstruction && (
             <p className="text-xs text-center mt-2 text-red-400/80">
-                * 需要语音模型。请先上传并处理样本。
+                * 尚未激活。请先在左侧选择一个声线。
             </p>
         )}
     </div>
